@@ -67,7 +67,7 @@ jobs:
           echo "Determined version: $TARGET_VERSION"
           
           # Set version locally in package.json (temporary inside runner, won't trigger CI loop)
-          npm version "$TARGET_VERSION" --no-git-tag-version
+          npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
           
           # Push the tag to GitHub
           git tag "v$TARGET_VERSION"
