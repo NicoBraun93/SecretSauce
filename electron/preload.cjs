@@ -20,4 +20,10 @@ contextBridge.exposeInMainWorld("api", {
     set: (key, value) => ipcRenderer.invoke("keychain:set", { key, value }),
     delete: (key) => ipcRenderer.invoke("keychain:delete", key),
   },
+  launchd: {
+    list: () => ipcRenderer.invoke("launchd:list"),
+    upsert: (filePath, key, value) => ipcRenderer.invoke("launchd:upsert", { filePath, key, value }),
+    delete: (filePath, key) => ipcRenderer.invoke("launchd:delete", { filePath, key }),
+    control: (action, filePath, label) => ipcRenderer.invoke("launchd:control", { action, filePath, label }),
+  },
 });

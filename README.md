@@ -1,50 +1,91 @@
 # EnvManager
 
-Simple macOS GUI to view and manage environment variables and secrets across:
+A premium, lightweight macOS desktop utility to view and manage environment variables, secrets, `.env` files, and Launchd agents in one unified dashboard.
 
-- Shell profile (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, `~/.profile`)
-- `.env` files (open any file or create a new one)
-- macOS Keychain (generic passwords under the `EnvManager:<key>` service)
+---
 
-## Build it yourself
+## 🚀 Download Pre-Compiled Releases
 
-Requires Node.js 18+ and macOS.
+You do not need to build the app from source! You can download the latest version pre-compiled for your Mac architecture directly from the GitHub releases:
+
+1. Go to the [Releases](../../releases) tab on your GitHub repository.
+2. Download the ZIP package corresponding to your Mac:
+   - **Apple Silicon (M1/M2/M3/M4/etc.):** Download `EnvManager-mac-arm64.zip`
+   - **Intel Macs:** Download `EnvManager-mac-x64.zip`
+3. Unzip the file and move `EnvManager.app` into your `/Applications` directory.
+
+> [!NOTE]
+> ** macOS Gatekeeper Note:** Because this application is self-signed/unsigned, macOS might block its first launch. To run it:
+> - Right-click the app in Finder and choose **Open**, OR
+> - Run the following command in Terminal to clear the quarantine attribute:
+>   ```bash
+>   xattr -cr /Applications/EnvManager.app
+>   ```
+
+---
+
+## ✨ Features
+
+- **Shell Profiles Manager:** Intuitively read, insert, update, or remove export statements in your shell profiles (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, `~/.profile`). Comments and custom formatting are preserved in-place.
+- **`.env` File Editor:** Easily create or open any local `.env` configuration file to edit key-value pairs inside a clean interface.
+- **macOS Keychain Integration:** Safely view, add, or delete secure generic passwords stored in the macOS Keychain under the `EnvManager:<key>` namespace. Uses a local filesystem index (`~/.env-manager-keychain-index.json`) for quick listing.
+- **Launchd Management:** View, load, unload, start, and stop macOS Launchd agents, allowing you to manage plist-based background services and environment variables on the fly.
+- **Local System Environment:** Inspect active environment variables (`process.env`) currently accessible to applications.
+
+---
+
+## 🛠️ Build and Development
+
+### Prerequisites
+
+- macOS
+- Node.js (v18 or newer)
+- npm (v9 or newer)
+
+### 1. Installation
+
+Clone this repository and install the dependencies from the root directory:
 
 ```bash
-cd electron-app
+git clone <your-repository-url>
+cd EnvManager
 npm install
 ```
 
-### Run in dev mode
+### 2. Run in Development Mode
+
+Run the following command in one terminal to spin up the Vite development server:
 
 ```bash
-npm run dev          # in one terminal: starts Vite on :5173
-npx electron .       # in another terminal: launches the app
+npm run dev
 ```
 
-### Package a standalone `.app`
-
-Apple Silicon (M1/M2/M3):
+In another terminal, launch the Electron application wrapper:
 
 ```bash
-npm run package:mac-arm
+npx electron .
 ```
 
-Intel Macs:
+### 3. Package Standalone `.app`
 
-```bash
-npm run package:mac-x64
-```
+To package a standalone `.app` bundle:
 
-The built app is written to `release/EnvManager-darwin-<arch>/EnvManager.app`.
-Double-click it to launch, or drag it into `/Applications`.
+- **Apple Silicon (ARM64):**
+  ```bash
+  npm run package:mac-arm
+  ```
+- **Intel (x64):**
+  ```bash
+  npm run package:mac-x64
+  ```
 
-> The app is not code-signed. The first launch will be blocked by Gatekeeper —
-> right-click → **Open**, or run `xattr -cr release/EnvManager-darwin-*/EnvManager.app`.
+The compiled binaries will be outputted to the `release/` directory.
 
-## Notes
+---
 
-- Keychain entries are stored under the service name `EnvManager:<key>` and
-  indexed in `~/.env-manager-keychain-index.json` so the app can list them.
-- Shell edits rewrite `export KEY="value"` lines in place; existing comments
-  and ordering are preserved.
+## 🔒 Security & Architecture
+
+- **Keychain Operations:** Accesses macOS Keychain using the native `/usr/bin/security` command-line utility. This avoids unsafe node module packaging issues.
+- **Configuration Editing:** Uses native `/usr/bin/plutil` and `/bin/launchctl` to interface securely with user Plist agents.
+- **IPC Sandboxing:** Employs IPC (Inter-Process Communication) and preload script bridging (`electron/preload.cjs`) to separate frontend web views from system-level privilege actions.
+

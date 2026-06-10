@@ -21,6 +21,20 @@ declare global {
         set: (key: string, value: string) => Promise<boolean>;
         delete: (key: string) => Promise<boolean>;
       };
+      launchd: {
+        list: () => Promise<{
+          label: string;
+          filePath: string;
+          vars: { key: string; value: string }[];
+          program: string;
+          loaded: boolean;
+          pid: number | null;
+          lastExitCode?: number;
+        }[]>;
+        upsert: (filePath: string, key: string, value: string) => Promise<boolean>;
+        delete: (filePath: string, key: string) => Promise<boolean>;
+        control: (action: "load" | "unload" | "start" | "stop", filePath: string, label: string) => Promise<boolean>;
+      };
     };
   }
 }

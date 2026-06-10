@@ -214,3 +214,130 @@ ipcMain.handle("keychain:delete", async (_e, key) => {
 ipcMain.handle("env:system", () => {
   return Object.entries(process.env).map(([key, value]) => ({ key, value: value || "" }));
 });
+
+// ---------- Launchd Management ----------
+
+function readPlist(filePath) {
+  return new Promise((resolve, reject) => {
+    execFile("/usr/bin/plutil", ["-convert", "json", "-o", "-", filePath], (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+function writePlist(filePath, obj) {
+  return new Promise((resolve, reject) => {
+    const jsonStr = JSON.stringify(obj);
+    const child = execFile("/usr/bin/plutil", ["-convert", "xml1", "-o", filePath, "-"], (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(true);
+    });
+    child.stdin.write(jsonStr);
+    child.stdin.end();
+  });
+}
+
+function getLaunchdStatuses() {
+  return new Promise((resolve) => {
+    execFile("/bin/launchctl", ["list"], (err, stdout) => {
+      if (err) return resolve({});
+      const statuses = {};
+      stdout.split("\n").forEach((line) => {
+        const parts = line.split("\t");
+        if (parts.length >= 3) {
+          const pid = parts[0] === "-" ? null : parseInt(parts[0], 10);
+          const lastExitCode = parseInt(parts[1], 10);
+          const label = parts[2].trim();
+          statuses[label] = { loaded: true, pid, lastExitCode };
+        }
+      });
+      resolve(statuses);
+    });
+  });
+}
+
+ipcMain.handle("launchd:list", async () => {
+  const dir = path.join(os.homedir(), "Library", "LaunchAgents");
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".plist"));
+  
+  const statuses = await getLaunchdStatuses();
+  const services = [];
+
+  for (const f of files) {
+    const filePath = path.join(dir, f);
+    try {
+      const obj = await readPlist(filePath);
+      const label = obj.Label || f.replace(/\.plist$/, "");
+      const envObj = obj.EnvironmentVariables || {};
+      const vars = Object.entries(envObj).map(([key, value]) => ({ key, value: String(value) }));
+      const program = obj.Program || (Array.isArray(obj.ProgramArguments) ? obj.ProgramArguments.join(" ") : "");
+      
+      const status = statuses[label] || { loaded: false };
+      services.push({
+        label,
+        filePath,
+        vars,
+        program,
+        loaded: status.loaded,
+        pid: status.pid,
+        lastExitCode: status.lastExitCode,
+      });
+    } catch (err) {
+      console.error(`Failed to read launchd plist ${f}:`, err);
+    }
+  }
+
+  return services;
+});
+
+ipcMain.handle("launchd:upsert", async (_e, { filePath, key, value }) => {
+  const obj = await readPlist(filePath);
+  if (!obj.EnvironmentVariables) obj.EnvironmentVariables = {};
+  obj.EnvironmentVariables[key] = value;
+  await writePlist(filePath, obj);
+  return true;
+});
+
+ipcMain.handle("launchd:delete", async (_e, { filePath, key }) => {
+  const obj = await readPlist(filePath);
+  if (obj.EnvironmentVariables) {
+    delete obj.EnvironmentVariables[key];
+    if (Object.keys(obj.EnvironmentVariables).length === 0) {
+      delete obj.EnvironmentVariables;
+    }
+    await writePlist(filePath, obj);
+  }
+  return true;
+});
+
+ipcMain.handle("launchd:control", async (_e, { action, filePath, label }) => {
+  let cmd, args;
+  if (action === "load") {
+    cmd = "/bin/launchctl";
+    args = ["load", filePath];
+  } else if (action === "unload") {
+    cmd = "/bin/launchctl";
+    args = ["unload", filePath];
+  } else if (action === "start") {
+    cmd = "/bin/launchctl";
+    args = ["start", label];
+  } else if (action === "stop") {
+    cmd = "/bin/launchctl";
+    args = ["stop", label];
+  } else {
+    throw new Error("Invalid launchd action");
+  }
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(true);
+    });
+  });
+});
+

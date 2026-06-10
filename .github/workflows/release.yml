@@ -1,0 +1,128 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release macOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Determine and Set Version
+        id: versioning
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Get base version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          echo "Base version from package.json: $BASE_VERSION"
+
+          # Fetch all tags from origin to check existence
+          git fetch --tags
+
+          # Check if tag v$BASE_VERSION exists
+          if git rev-parse "refs/tags/v$BASE_VERSION" >/dev/null 2>&1; then
+            echo "Tag v$BASE_VERSION already exists. Bumping version..."
+            
+            # Find latest tag matching v<major>.<minor>.*
+            IFS='.' read -r major minor patch <<< "$BASE_VERSION"
+            LATEST_TAG=$(git tag -l "v$major.$minor.*" | sort -V | tail -n1)
+            
+            if [ -z "$LATEST_TAG" ]; then
+              LATEST_TAG="v$BASE_VERSION"
+            fi
+            
+            echo "Latest tag found: $LATEST_TAG"
+            LATEST_VERSION="${LATEST_TAG#v}"
+            
+            IFS='.' read -r major minor patch <<< "$LATEST_VERSION"
+            new_patch=$((patch + 1))
+            TARGET_VERSION="$major.$minor.$new_patch"
+          else
+            echo "Tag v$BASE_VERSION does not exist yet. Using base version..."
+            TARGET_VERSION="$BASE_VERSION"
+          fi
+
+          echo "Determined version: $TARGET_VERSION"
+          
+          # Set version locally in package.json (temporary inside runner, won't trigger CI loop)
+          npm version "$TARGET_VERSION" --no-git-tag-version
+          
+          # Push the tag to GitHub
+          git tag "v$TARGET_VERSION"
+          git push origin "v$TARGET_VERSION"
+          
+          echo "version=v$TARGET_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package macOS Applications (arm64 & x64)
+        run: |
+          npm run package:mac-arm
+          npm run package:mac-x64
+
+      - name: Compress App Bundles
+        run: |
+          mkdir -p dist-release
+          
+          # Compress Apple Silicon Build (preserving symlinks)
+          echo "Compressing macOS Apple Silicon build..."
+          cd release/EnvManager-darwin-arm64
+          zip -y -r ../../dist-release/EnvManager-mac-arm64.zip EnvManager.app
+          cd ../..
+
+          # Compress Intel Build (preserving symlinks)
+          echo "Compressing macOS Intel build..."
+          cd release/EnvManager-darwin-x64
+          zip -y -r ../../dist-release/EnvManager-mac-x64.zip EnvManager.app
+          cd ../..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versioning.outputs.version }}
+          name: EnvManager ${{ steps.versioning.outputs.version }}
+          body: |
+            ## Automated Release
+            
+            Pre-compiled desktop binaries for EnvManager.
+            
+            ### Installation Instructions
+            
+            1. Download the ZIP file corresponding to your Mac architecture:
+               - **Apple Silicon (M1/M2/M3/M4):** `EnvManager-mac-arm64.zip`
+               - **Intel Macs:** `EnvManager-mac-x64.zip`
+            2. Extract the downloaded ZIP file to get `EnvManager.app`.
+            3. Move `EnvManager.app` to your `/Applications` directory.
+            4. **Note on Gatekeeper:** Since this app is self-signed/unsigned, macOS might block its first launch. To run it:
+               - Right-click `EnvManager.app` and choose **Open**, OR
+               - Run the following command in Terminal:
+                 ```bash
+                 xattr -cr /Applications/EnvManager.app
+                 ```
+          draft: false
+          prerelease: false
+          files: |
+            dist-release/EnvManager-mac-arm64.zip
+            dist-release/EnvManager-mac-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
