@@ -84,17 +84,13 @@ jobs:
         run: |
           mkdir -p dist-release
           
-          # Compress Apple Silicon Build (preserving symlinks)
+          # Compress Apple Silicon Build (preserving symlinks and metadata)
           echo "Compressing macOS Apple Silicon build..."
-          cd release/SecretSauce-darwin-arm64
-          zip -y -r ../../dist-release/SecretSauce-mac-arm64.zip SecretSauce.app
-          cd ../..
+          ditto -c -k --sequesterRsrc --keepParent release/SecretSauce-darwin-arm64/SecretSauce.app dist-release/SecretSauce-mac-arm64.zip
 
-          # Compress Intel Build (preserving symlinks)
+          # Compress Intel Build (preserving symlinks and metadata)
           echo "Compressing macOS Intel build..."
-          cd release/SecretSauce-darwin-x64
-          zip -y -r ../../dist-release/SecretSauce-mac-x64.zip SecretSauce.app
-          cd ../..
+          ditto -c -k --sequesterRsrc --keepParent release/SecretSauce-darwin-x64/SecretSauce.app dist-release/SecretSauce-mac-x64.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

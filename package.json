@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "package:mac-arm": "vite build && electron-packager . SecretSauce --platform=darwin --arch=arm64 --out=release --overwrite --ignore='^/release' --ignore='^/src' --ignore='^/node_modules/(?!(electron-packager))'",
+    "package:mac-arm": "vite build && electron-packager . SecretSauce --platform=darwin --arch=arm64 --out=release --overwrite --ignore='^/release' --ignore='^/src'",
     "package:mac-x64": "vite build && electron-packager . SecretSauce --platform=darwin --arch=x64 --out=release --overwrite --ignore='^/release' --ignore='^/src'"
   },
   "devDependencies": {
