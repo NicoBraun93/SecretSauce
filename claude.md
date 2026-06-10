@@ -1,12 +1,12 @@
-# Developer & Agent Instructions: EnvManager Repository
+# Developer & Agent Instructions: SecretSauce Repository
 
-Welcome! This guide is designed for developers and AI agents working on the **EnvManager** codebase. It outlines the architecture, macOS integrations, development lifecycle, and CI/CD setup to ensure consistency and prevent errors.
+Welcome! This guide is designed for developers and AI agents working on the **SecretSauce** codebase. It outlines the architecture, macOS integrations, development lifecycle, and CI/CD setup to ensure consistency and prevent errors.
 
 ---
 
 ## 📌 Technical Stack
 
-- **Frontend:** React 18 (TypeScript), Vite 5, Vanilla CSS (Premium outfit font and JetBrains Mono fonts, dark theme).
+- **Frontend:** React 18 (TypeScript), Vite 5, Vanilla CSS (Premium Outfit font and JetBrains Mono fonts, dark theme).
 - **Desktop Wrapper:** Electron 32.
 - **OS Integrations:** Executed via standard macOS binaries (`/usr/bin/security`, `/usr/bin/plutil`, `/bin/launchctl`) called from the Electron main process via `child_process.execFile`. No native C++ Node addons are used, simplifying builds and cross-compilation.
 
@@ -27,8 +27,10 @@ graph TD
 Handles system-level actions:
 - **Shell Profile editing:** Parses and replaces `export KEY="value"` in profile files.
 - **`.env` parsing:** Serializes/deserializes env variables.
-- **macOS Keychain:** Spawns `/usr/bin/security` to add, delete, and read generic passwords under the service prefix `EnvManager:`. Synchronizes keys using `~/.env-manager-keychain-index.json`.
-- **Launchd Plist files:** Spawns `/usr/bin/plutil` to convert XML plists in `~/Library/LaunchAgents` to JSON for reading and vice versa for writing. Spawns `/bin/launchctl` for agent control (`load`, `unload`, `start`, `stop`).
+- **macOS Keychain:** Spawns `/usr/bin/security` to add, delete, and read generic passwords under the service prefix `SecretSauce:`.
+  - **Index File Migration:** Automatically copies the old `~/.env-manager-keychain-index.json` to `~/.secret-sauce-keychain-index.json` if the new file does not exist yet.
+  - **Read Fallback:** If a key is requested under `SecretSauce:<key>` and is not found, the process attempts to read from `EnvManager:<key>` to ensure compatibility with pre-existing keys.
+  - **Cleanup:** On delete, it removes the entry from both namespaces to prevent orphan secrets.
 
 ### 2. Preload Script: [electron/preload.cjs](file:///Users/nico/Workspace/EnvManager/electron/preload.cjs)
 Exposes safe renderer APIs through `contextBridge.exposeInMainWorld("api", ...)` to prevent raw Node.js access in the frontend.
@@ -62,7 +64,7 @@ Creates a standalone unsigned `.app` inside the `release/` folder.
 Unsigned apps are blocked on first launch. Clear the Gatekeeper flags with:
 
 ```bash
-xattr -cr release/EnvManager-darwin-*/EnvManager.app
+xattr -cr release/SecretSauce-darwin-*/SecretSauce.app
 ```
 
 ---

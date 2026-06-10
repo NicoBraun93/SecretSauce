@@ -12,7 +12,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="titlebar">Env Manager</div>
+      <div className="titlebar">SecretSauce</div>
       <div className="tabs">
         <div className={`tab ${tab === "localEnv" ? "active" : ""}`} onClick={() => setTab("localEnv")}>
           Local Env

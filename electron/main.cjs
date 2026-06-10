@@ -154,10 +154,22 @@ function sec(args) {
   });
 }
 
-const KEYCHAIN_SERVICE_PREFIX = "EnvManager:";
+const KEYCHAIN_SERVICE_PREFIX = "SecretSauce:";
 
 function readIndexSafely() {
-  const indexPath = path.join(os.homedir(), ".env-manager-keychain-index.json");
+  const newPath = path.join(os.homedir(), ".secret-sauce-keychain-index.json");
+  const oldPath = path.join(os.homedir(), ".env-manager-keychain-index.json");
+
+  // Migrate index if old one exists but new one doesn't
+  if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+    try {
+      fs.copyFileSync(oldPath, newPath);
+    } catch (e) {
+      console.error("Failed to migrate keychain index:", e);
+    }
+  }
+
+  const indexPath = fs.existsSync(newPath) ? newPath : oldPath;
   if (!fs.existsSync(indexPath)) return [];
   try {
     const data = fs.readFileSync(indexPath, "utf8").trim();
@@ -174,7 +186,7 @@ ipcMain.handle("keychain:list", async () => {
 });
 
 function saveIndex(keys) {
-  const indexPath = path.join(os.homedir(), ".env-manager-keychain-index.json");
+  const indexPath = path.join(os.homedir(), ".secret-sauce-keychain-index.json");
   fs.writeFileSync(indexPath, JSON.stringify([...new Set(keys)]), "utf8");
 }
 
@@ -183,7 +195,13 @@ ipcMain.handle("keychain:get", async (_e, key) => {
     const out = await sec(["find-generic-password", "-s", KEYCHAIN_SERVICE_PREFIX + key, "-a", os.userInfo().username, "-w"]);
     return out.trim();
   } catch {
-    return null;
+    // Fallback to old service prefix if new one isn't found
+    try {
+      const out = await sec(["find-generic-password", "-s", "EnvManager:" + key, "-a", os.userInfo().username, "-w"]);
+      return out.trim();
+    } catch {
+      return null;
+    }
   }
 });
 
@@ -204,6 +222,9 @@ ipcMain.handle("keychain:set", async (_e, { key, value }) => {
 ipcMain.handle("keychain:delete", async (_e, key) => {
   try {
     await sec(["delete-generic-password", "-s", KEYCHAIN_SERVICE_PREFIX + key, "-a", os.userInfo().username]);
+  } catch {}
+  try {
+    await sec(["delete-generic-password", "-s", "EnvManager:" + key, "-a", os.userInfo().username]);
   } catch {}
   const keys = readIndexSafely();
   saveIndex(keys.filter((k) => k !== key));

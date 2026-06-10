@@ -12,7 +12,7 @@ export default function KeychainTab() {
   return (
     <>
       <div className="toolbar">
-        <span className="subtle">Secrets are stored in the macOS Keychain under service <code>EnvManager:&lt;key&gt;</code>.</span>
+        <span className="subtle">Secrets are stored in the macOS Keychain under service <code>SecretSauce:&lt;key&gt;</code>.</span>
       </div>
       <VarTable
         vars={vars}

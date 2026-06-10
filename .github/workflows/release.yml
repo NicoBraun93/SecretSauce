@@ -86,43 +86,43 @@ jobs:
           
           # Compress Apple Silicon Build (preserving symlinks)
           echo "Compressing macOS Apple Silicon build..."
-          cd release/EnvManager-darwin-arm64
-          zip -y -r ../../dist-release/EnvManager-mac-arm64.zip EnvManager.app
+          cd release/SecretSauce-darwin-arm64
+          zip -y -r ../../dist-release/SecretSauce-mac-arm64.zip SecretSauce.app
           cd ../..
 
           # Compress Intel Build (preserving symlinks)
           echo "Compressing macOS Intel build..."
-          cd release/EnvManager-darwin-x64
-          zip -y -r ../../dist-release/EnvManager-mac-x64.zip EnvManager.app
+          cd release/SecretSauce-darwin-x64
+          zip -y -r ../../dist-release/SecretSauce-mac-x64.zip SecretSauce.app
           cd ../..
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.versioning.outputs.version }}
-          name: EnvManager ${{ steps.versioning.outputs.version }}
+          name: SecretSauce ${{ steps.versioning.outputs.version }}
           body: |
             ## Automated Release
             
-            Pre-compiled desktop binaries for EnvManager.
+            Pre-compiled desktop binaries for SecretSauce.
             
             ### Installation Instructions
             
             1. Download the ZIP file corresponding to your Mac architecture:
-               - **Apple Silicon (M1/M2/M3/M4):** `EnvManager-mac-arm64.zip`
-               - **Intel Macs:** `EnvManager-mac-x64.zip`
-            2. Extract the downloaded ZIP file to get `EnvManager.app`.
-            3. Move `EnvManager.app` to your `/Applications` directory.
+               - **Apple Silicon (M1/M2/M3/M4):** `SecretSauce-mac-arm64.zip`
+               - **Intel Macs:** `SecretSauce-mac-x64.zip`
+            2. Extract the downloaded ZIP file to get `SecretSauce.app`.
+            3. Move `SecretSauce.app` to your `/Applications` directory.
             4. **Note on Gatekeeper:** Since this app is self-signed/unsigned, macOS might block its first launch. To run it:
-               - Right-click `EnvManager.app` and choose **Open**, OR
+               - Right-click `SecretSauce.app` and choose **Open**, OR
                - Run the following command in Terminal:
                  ```bash
-                 xattr -cr /Applications/EnvManager.app
+                 xattr -cr /Applications/SecretSauce.app
                  ```
           draft: false
           prerelease: false
           files: |
-            dist-release/EnvManager-mac-arm64.zip
-            dist-release/EnvManager-mac-x64.zip
+            dist-release/SecretSauce-mac-arm64.zip
+            dist-release/SecretSauce-mac-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
