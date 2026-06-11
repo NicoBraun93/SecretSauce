@@ -63,6 +63,19 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>© Nico Braun</string>
+    <!-- ip-api.com's free geo endpoint is HTTP-only; ATS blocks plain HTTP
+         without this scoped exception (used by the Network Monitor map). -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>ip-api.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
 </dict>
 </plist>
 PLIST

@@ -6,6 +6,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case envFiles = ".env Files"
     case keychain = "Keychain Secrets"
     case launchd = "Launchd Services"
+    case network = "Network Monitor"
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .envFiles: return "doc.text"
         case .keychain: return "key.fill"
         case .launchd: return "gearshape.2"
+        case .network: return "network"
         }
     }
 }
@@ -41,6 +43,7 @@ struct ContentView: View {
             case .envFiles: EnvFilesView()
             case .keychain: KeychainView()
             case .launchd: LaunchdView()
+            case .network: NetworkView()
             }
         }
         .navigationTitle("SecretSauce")

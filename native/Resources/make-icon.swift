@@ -32,20 +32,22 @@ func tilePath() -> CGPath {
 }
 
 /// Outer droplet silhouette (pointed top, round bottom).
+/// Sits slightly above the tile's vertical center so the top/bottom margins
+/// feel balanced (108 vs 120 px in the 1024 space).
 func dropletPath() -> CGPath {
     let p = CGMutablePath()
     let cx: CGFloat = 512
-    let bottomCenter = CGPoint(x: cx, y: 612)
+    let bottomCenter = CGPoint(x: cx, y: 572)
     let r: CGFloat = 232
-    let tip = CGPoint(x: cx, y: 248)
+    let tip = CGPoint(x: cx, y: 208)
     p.move(to: tip)
     p.addCurve(to: CGPoint(x: bottomCenter.x - r, y: bottomCenter.y),
-               control1: CGPoint(x: cx - 36, y: 430),
+               control1: CGPoint(x: cx - 36, y: 390),
                control2: CGPoint(x: bottomCenter.x - r, y: bottomCenter.y - 150))
     p.addArc(center: bottomCenter, radius: r, startAngle: .pi, endAngle: 0, clockwise: true)
     p.addCurve(to: tip,
                control1: CGPoint(x: bottomCenter.x + r, y: bottomCenter.y - 150),
-               control2: CGPoint(x: cx + 36, y: 430))
+               control2: CGPoint(x: cx + 36, y: 390))
     p.closeSubpath()
     return p
 }
@@ -56,15 +58,17 @@ func dropletPath() -> CGPath {
 func keyholePath() -> CGPath {
     let p = CGMutablePath()
     let cx: CGFloat = 512
-    let headCenter = CGPoint(x: cx, y: 520)
+    // Head circle centered exactly on the droplet's round bulb (572).
+    let headCenter = CGPoint(x: cx, y: 572)
     let headR: CGFloat = 86
     p.addEllipse(in: CGRect(x: headCenter.x - headR, y: headCenter.y - headR,
                             width: headR * 2, height: headR * 2))
-    // Slot starts above the head's center so it fuses smoothly into the circle.
+    // Slot starts at the head's center so it fuses smoothly into the circle;
+    // it ends 60 px above the bulb's bottom edge (804) to keep a solid rim.
     p.move(to: CGPoint(x: cx - 30, y: headCenter.y))
     p.addLine(to: CGPoint(x: cx + 30, y: headCenter.y))
-    p.addLine(to: CGPoint(x: cx + 58, y: 726))
-    p.addLine(to: CGPoint(x: cx - 58, y: 726))
+    p.addLine(to: CGPoint(x: cx + 53, y: 744))
+    p.addLine(to: CGPoint(x: cx - 53, y: 744))
     p.closeSubpath()
     return p
 }

@@ -47,6 +47,7 @@ You do not need to build the app from source! You can download the latest pre-co
 - **macOS Keychain Integration:** Safely view, add, or delete secure generic passwords stored in the macOS Keychain under the `SecretSauce:<key>` namespace. Uses a local filesystem index (`~/.secret-sauce-keychain-index.json`) for quick listing. Automatically migrates old data from `EnvManager` namespace.
 - **Launchd Management:** View, load, unload, start, and stop macOS Launchd agents, allowing you to manage plist-based background services and environment variables on the fly.
 - **Local System Environment:** Inspect the active session's environment variables, and persist any of them to your shell profile with one click.
+- **Network Monitor:** A read-only, Little-Snitch-style view of your machine's open connections: which app talks to which remote IP, host, port, and state — plus a world map with your own location and animated arcs to every endpoint. Hover a dot for details, click it to filter the table. Country/city lookup runs when you open the tab or press Refresh, and is the only thing in the app that sends data off-device.
 
 ---
 
@@ -83,4 +84,5 @@ The compiled bundle is written to the `release/` directory.
 
 - **Keychain Operations:** Accesses the macOS Keychain through the native `/usr/bin/security` command-line utility, so existing keychain access controls remain valid.
 - **Launchd Management:** Reads and writes agent plists with `PropertyListSerialization` and controls services via `/bin/launchctl`.
+- **Network Monitor:** Samples open connections via `/usr/sbin/lsof` and resolves hostnames with `/usr/bin/host` — all local. Geo lookups go to ip-api.com when the Network Monitor tab is opened or refreshed — the app's **only** off-device traffic (HTTP-only free tier; the app bundle carries a scoped ATS exception for that single domain). It observes only — blocking traffic would require an Apple-entitled Network Extension.
 - **No Web Layer:** As a native AppKit/SwiftUI app, there is no embedded browser, renderer process, or IPC bridge — system-level actions run directly in a single process.
