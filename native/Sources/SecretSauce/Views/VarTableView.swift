@@ -29,12 +29,12 @@ struct VarTableView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.dsMutedForeground)
                 TextField("Filter variables by key or value…", text: $search)
                     .textFieldStyle(.plain)
             }
             .padding(8)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .background(Color.dsSecondary, in: RoundedRectangle(cornerRadius: 8))
             .padding([.horizontal, .top], 12)
 
             addRow
@@ -102,10 +102,10 @@ struct VarTableView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
-                            (isPersistent ? Color.green : Color.orange).opacity(0.18),
+                            (isPersistent ? Color.dsSuccess : Color.dsWarning).opacity(0.18),
                             in: Capsule()
                         )
-                        .foregroundStyle(isPersistent ? Color.green : Color.orange)
+                        .foregroundStyle(isPersistent ? Color.dsSuccess : Color.dsWarning)
                 }
             }
             .frame(width: 280, alignment: .leading)
@@ -118,7 +118,7 @@ struct VarTableView: View {
             } else {
                 Text(secret ? (revealed[v.key] ?? "••••••••") : v.value)
                     .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.dsMutedForeground)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)

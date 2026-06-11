@@ -50,7 +50,7 @@ struct LaunchdView: View {
                 List(services, selection: $selectedLabel) { s in
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(s.loaded && s.pid != nil ? Color.green : s.loaded ? Color.yellow : Color.gray)
+                            .fill(s.loaded && s.pid != nil ? Color.dsSuccess : s.loaded ? Color.dsWarning : Color.dsMutedForeground)
                             .frame(width: 8, height: 8)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(s.label)
@@ -90,15 +90,15 @@ struct LaunchdView: View {
                                 .textSelection(.enabled)
                                 .padding(8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                                .background(Color.dsSecondary, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
 
                     HStack(spacing: 12) {
-                        statusCard("State", s.loaded ? "Loaded" : "Unloaded", s.loaded ? .green : .secondary)
-                        statusCard("Process (PID)", s.pid.map(String.init) ?? "Not Running", s.pid != nil ? .green : .secondary)
+                        statusCard("State", s.loaded ? "Loaded" : "Unloaded", s.loaded ? Color.dsSuccess : Color.dsMutedForeground)
+                        statusCard("Process (PID)", s.pid.map(String.init) ?? "Not Running", s.pid != nil ? Color.dsSuccess : Color.dsMutedForeground)
                         if s.loaded, let code = s.lastExitCode {
-                            statusCard("Last Exit Code", String(code), .primary)
+                            statusCard("Last Exit Code", String(code), Color.dsPrimary)
                         }
                     }
 
@@ -168,7 +168,7 @@ struct LaunchdView: View {
         }
         .padding(10)
         .frame(minWidth: 130, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.dsSecondary, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func control(_ action: LaunchdManager.Action, _ s: LaunchdService) {

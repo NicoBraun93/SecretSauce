@@ -13,7 +13,7 @@ struct EnvFilesView: View {
                 Button("Open .env file…") { open() }
                 Button("New .env file…") { create() }
                 if let filePath {
-                    Text("File").foregroundStyle(.secondary)
+                    Text("File").foregroundStyle(Color.dsMutedForeground)
                     PathPill(text: filePath)
                 }
                 Spacer()
@@ -23,7 +23,7 @@ struct EnvFilesView: View {
             if filePath == nil {
                 Spacer()
                 Text("Open or create a .env file to manage its variables.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.dsMutedForeground)
                 Spacer()
             } else {
                 VarTableView(

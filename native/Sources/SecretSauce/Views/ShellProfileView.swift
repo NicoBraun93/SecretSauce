@@ -8,12 +8,12 @@ struct ShellProfileView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Editing").foregroundStyle(.secondary)
+                Text("Editing").foregroundStyle(Color.dsMutedForeground)
                 PathPill(text: path.isEmpty ? "…" : path)
                 Spacer()
                 Text("Restart your terminal or run `source \(URL(fileURLWithPath: path).lastPathComponent)` to apply.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.dsMutedForeground)
             }
             .padding(12)
             Divider()
@@ -58,7 +58,7 @@ struct PathPill: View {
             .truncationMode(.middle)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(.quaternary.opacity(0.6), in: Capsule())
+            .background(Color.dsSecondary, in: Capsule())
     }
 }
 

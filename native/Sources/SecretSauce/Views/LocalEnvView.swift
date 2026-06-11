@@ -10,7 +10,7 @@ struct LocalEnvView: View {
             HStack {
                 Text("Viewing active session environment variables. Save any variable to make it persistent in your Shell Profile.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.dsMutedForeground)
                 Spacer()
                 Button("Refresh") { load() }
             }

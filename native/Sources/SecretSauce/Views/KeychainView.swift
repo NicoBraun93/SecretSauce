@@ -9,7 +9,7 @@ struct KeychainView: View {
             HStack {
                 Text("Secrets are stored in the macOS Keychain under service `SecretSauce:<key>`.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.dsMutedForeground)
                 Spacer()
             }
             .padding(12)

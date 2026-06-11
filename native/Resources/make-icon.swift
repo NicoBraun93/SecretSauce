@@ -1,7 +1,9 @@
 // Generates the SecretSauce app icon entirely in code (no design tools needed).
 //
-// Motif: a sauce droplet whose negative space forms a keyhole — "secret" + "sauce" —
-// sitting on a vibrant purple→magenta gradient squircle in the macOS Big Sur style.
+// Motif: a sauce droplet with an empty keyhole cut into it — "secret" + "sauce".
+// Styled per the brand design system (Design_System/foundations): electric-blue
+// droplet on a near-black brand surface, no gradients, a subtle blue glow as the
+// signature elevation cue.
 //
 // Usage: swiftc make-icon.swift -o /tmp/makeicon && /tmp/makeicon <output-iconset-dir> <readme-png>
 // All drawing is done in a 1024×1024 top-left coordinate space and scaled per size.
@@ -17,49 +19,53 @@ func color(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> CGColor {
     CGColor(colorSpace: cs, components: [CGFloat(r), CGFloat(g), CGFloat(b), CGFloat(a)])!
 }
 
-/// Rounded-rect "squircle" tile path, inset to leave a margin for the icon shadow.
+// --- Brand palette (Design_System/foundations/tokens.css) ---
+let brandSurface = color(0.051, 0.059, 0.071) // #0d0f12 — app canvas / dark surface
+let brandStroke  = color(0.16, 0.18, 0.235)   // subtle tile edge for definition on dark Docks
+let brandBlue    = color(0.231, 0.510, 0.961)  // #3b82f5 — electric blue (primary)
+
+/// Rounded-rect "squircle" tile path, inset to leave a margin for the icon shadow/glow.
 func tilePath() -> CGPath {
     let inset: CGFloat = 100
     let rect = CGRect(x: inset, y: inset, width: 1024 - 2 * inset, height: 1024 - 2 * inset)
     return CGPath(roundedRect: rect, cornerWidth: 186, cornerHeight: 186, transform: nil)
 }
 
-/// Droplet + keyhole foreground, built as one even-odd path so the keyhole is a true
-/// cut-out revealing the gradient behind it.
-func dropletKeyholePath() -> CGPath {
+/// Outer droplet silhouette (pointed top, round bottom).
+func dropletPath() -> CGPath {
     let p = CGMutablePath()
-
-    // --- Outer droplet silhouette (pointed top, round bottom) ---
     let cx: CGFloat = 512
     let bottomCenter = CGPoint(x: cx, y: 612)
     let r: CGFloat = 232
     let tip = CGPoint(x: cx, y: 248)
     p.move(to: tip)
-    // Left flank curving down to the left side of the bottom circle.
     p.addCurve(to: CGPoint(x: bottomCenter.x - r, y: bottomCenter.y),
                control1: CGPoint(x: cx - 36, y: 430),
                control2: CGPoint(x: bottomCenter.x - r, y: bottomCenter.y - 150))
-    // Bottom semicircle (left → right, sweeping through the bottom).
-    p.addArc(center: bottomCenter, radius: r,
-             startAngle: .pi, endAngle: 0, clockwise: true)
-    // Right flank curving back up to the tip.
+    p.addArc(center: bottomCenter, radius: r, startAngle: .pi, endAngle: 0, clockwise: true)
     p.addCurve(to: tip,
                control1: CGPoint(x: bottomCenter.x + r, y: bottomCenter.y - 150),
                control2: CGPoint(x: cx + 36, y: 430))
     p.closeSubpath()
+    return p
+}
 
-    // --- Keyhole cut-out: round head + tapered slot ---
-    let headCenter = CGPoint(x: cx, y: 560)
-    p.addEllipse(in: CGRect(x: headCenter.x - 92, y: headCenter.y - 92, width: 184, height: 184))
-
-    let slot = CGMutablePath()
-    slot.move(to: CGPoint(x: cx - 52, y: 612))
-    slot.addLine(to: CGPoint(x: cx + 52, y: 612))
-    slot.addLine(to: CGPoint(x: cx + 86, y: 792))
-    slot.addLine(to: CGPoint(x: cx - 86, y: 792))
-    slot.closeSubpath()
-    p.addPath(slot)
-
+/// Keyhole = round head + tapered slot. Built from two overlapping subpaths that
+/// are merged with NON-ZERO winding (not even-odd), so the overlap does not cancel
+/// out — giving one clean empty keyhole with no seam line.
+func keyholePath() -> CGPath {
+    let p = CGMutablePath()
+    let cx: CGFloat = 512
+    let headCenter = CGPoint(x: cx, y: 520)
+    let headR: CGFloat = 86
+    p.addEllipse(in: CGRect(x: headCenter.x - headR, y: headCenter.y - headR,
+                            width: headR * 2, height: headR * 2))
+    // Slot starts above the head's center so it fuses smoothly into the circle.
+    p.move(to: CGPoint(x: cx - 30, y: headCenter.y))
+    p.addLine(to: CGPoint(x: cx + 30, y: headCenter.y))
+    p.addLine(to: CGPoint(x: cx + 58, y: 726))
+    p.addLine(to: CGPoint(x: cx - 58, y: 726))
+    p.closeSubpath()
     return p
 }
 
@@ -70,30 +76,33 @@ func drawIcon(px: Int) -> CGImage {
     ctx.translateBy(x: 0, y: CGFloat(px))
     ctx.scaleBy(x: scale, y: -scale) // top-left origin, y grows downward
 
-    // 1. Gradient-filled tile.
+    // 1. Solid dark brand tile with a faint edge stroke for definition on dark backdrops.
     ctx.saveGState()
     ctx.addPath(tilePath())
-    ctx.clip()
-    let grad = CGGradient(colorsSpace: cs,
-                          colors: [color(0.51, 0.34, 1.0), color(0.76, 0.23, 0.84)] as CFArray,
-                          locations: [0, 1])!
-    ctx.drawLinearGradient(grad, start: CGPoint(x: 140, y: 140), end: CGPoint(x: 884, y: 884),
-                           options: [])
-
-    // 2. Soft top sheen for a glossy, dimensional look.
-    let sheen = CGGradient(colorsSpace: cs,
-                           colors: [color(1, 1, 1, 0.22), color(1, 1, 1, 0)] as CFArray,
-                           locations: [0, 1])!
-    ctx.drawLinearGradient(sheen, start: CGPoint(x: 512, y: 120), end: CGPoint(x: 512, y: 560),
-                           options: [])
+    ctx.setFillColor(brandSurface)
+    ctx.fillPath()
+    ctx.addPath(tilePath())
+    ctx.setStrokeColor(brandStroke)
+    ctx.setLineWidth(3)
+    ctx.strokePath()
     ctx.restoreGState()
 
-    // 3. White droplet/keyhole with a soft drop shadow.
+    // 2. Electric-blue droplet, with a soft blue glow (the brand's elevation cue).
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -22), blur: 34, color: color(0.05, 0.0, 0.15, 0.35))
-    ctx.addPath(dropletKeyholePath())
-    ctx.setFillColor(color(1, 1, 1, 0.97))
-    ctx.fillPath(using: .evenOdd)
+    ctx.addPath(tilePath())
+    ctx.clip() // keep the glow inside the tile
+    ctx.setShadow(offset: .zero, blur: 46, color: color(0.231, 0.510, 0.961, 0.55))
+    ctx.addPath(dropletPath())
+    ctx.setFillColor(brandBlue)
+    ctx.fillPath()
+    ctx.restoreGState()
+
+    // 3. Punch the empty keyhole by filling it with the tile colour (non-zero winding,
+    //    so the circle+slot overlap merges cleanly with no seam).
+    ctx.saveGState()
+    ctx.addPath(keyholePath())
+    ctx.setFillColor(brandSurface)
+    ctx.fillPath()
     ctx.restoreGState()
 
     return ctx.makeImage()!

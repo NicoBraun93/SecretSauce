@@ -62,7 +62,9 @@ npm run package        # alias for: bash native/package-app.sh
 > Note: multi-arch `swift build --arch arm64 --arch x86_64` in a single invocation requires full Xcode (xcbuild), so the script builds each slice separately and merges with `lipo`. This keeps it working with only the Command Line Tools.
 
 ### App Icon
-The icon is generated entirely in code — no design tools or binary source art to maintain. [native/Resources/make-icon.swift](file:///Users/nico/Workspace/SecretSauce/native/Resources/make-icon.swift) draws a droplet/keyhole motif on a gradient squircle with CoreGraphics. Regenerate with `bash native/make-icon.sh`, which writes `native/Resources/AppIcon.icns` (bundled by `package-app.sh`) and `native/Resources/icon.png` (used in the README). `package-app.sh` regenerates the `.icns` automatically if it is missing.
+The icon is generated entirely in code — no design tools or binary source art to maintain. [native/Resources/make-icon.swift](file:///Users/nico/Workspace/SecretSauce/native/Resources/make-icon.swift) draws the brand motif with CoreGraphics: an electric-blue droplet (`#3b82f5`) with an empty keyhole cut-out, on a solid near-black tile (`#0d0f12`) with a subtle blue glow — colors and style follow the shared design system in `~/Workspace/Design_System/foundations` (dark-first, no gradients, glow as elevation cue). Regenerate with `bash native/make-icon.sh`, which writes `native/Resources/AppIcon.icns` (bundled by `package-app.sh`) and `native/Resources/icon.png` (used in the README). `package-app.sh` regenerates the `.icns` automatically if it is missing.
+
+In-app colors use the same tokens via the adaptive `Color.ds*` definitions in [Theme.swift](file:///Users/nico/Workspace/SecretSauce/native/Sources/SecretSauce/Theme.swift); the UI follows the system light/dark appearance (no forced color scheme).
 
 ### Gatekeeper Workaround (Local builds)
 Unsigned/ad-hoc-signed apps are blocked on first launch. Clear the Gatekeeper flags with:

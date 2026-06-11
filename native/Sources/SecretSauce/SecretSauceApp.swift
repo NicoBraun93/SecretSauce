@@ -22,7 +22,9 @@ struct SecretSauceApp: App {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 980, minHeight: 640)
-                .preferredColorScheme(.dark)
+                .tint(Color.dsPrimary)
+            // No forced color scheme: the UI follows the system appearance
+            // (dark when macOS is in dark mode, light otherwise).
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 740)
