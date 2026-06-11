@@ -58,17 +58,18 @@ func dropletPath() -> CGPath {
 func keyholePath() -> CGPath {
     let p = CGMutablePath()
     let cx: CGFloat = 512
-    // Head circle centered exactly on the droplet's round bulb (572).
-    let headCenter = CGPoint(x: cx, y: 572)
+    // Head circle sits 16 px above the droplet's round bulb center (572) so the
+    // keyhole reads slightly high within the bulb.
+    let headCenter = CGPoint(x: cx, y: 556)
     let headR: CGFloat = 86
     p.addEllipse(in: CGRect(x: headCenter.x - headR, y: headCenter.y - headR,
                             width: headR * 2, height: headR * 2))
     // Slot starts at the head's center so it fuses smoothly into the circle;
-    // it ends 60 px above the bulb's bottom edge (804) to keep a solid rim.
+    // it ends 76 px above the bulb's bottom edge (804) to keep a solid rim.
     p.move(to: CGPoint(x: cx - 30, y: headCenter.y))
     p.addLine(to: CGPoint(x: cx + 30, y: headCenter.y))
-    p.addLine(to: CGPoint(x: cx + 53, y: 744))
-    p.addLine(to: CGPoint(x: cx - 53, y: 744))
+    p.addLine(to: CGPoint(x: cx + 53, y: 728))
+    p.addLine(to: CGPoint(x: cx - 53, y: 728))
     p.closeSubpath()
     return p
 }
