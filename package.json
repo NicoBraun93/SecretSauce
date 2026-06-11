@@ -1,25 +1,10 @@
 {
   "name": "secret-sauce",
   "version": "1.0.0",
-  "description": "Manage environment variables and secrets on macOS",
-  "main": "electron/main.cjs",
+  "description": "Native macOS app to manage environment variables and secrets",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "package:mac-arm": "vite build && electron-packager . SecretSauce --platform=darwin --arch=arm64 --out=release --overwrite --ignore='^/release' --ignore='^/src'",
-    "package:mac-x64": "vite build && electron-packager . SecretSauce --platform=darwin --arch=x64 --out=release --overwrite --ignore='^/release' --ignore='^/src'"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^32.0.0",
-    "@electron/packager": "^18.3.5",
-    "typescript": "^5.5.0",
-    "vite": "^5.4.0"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "package": "bash native/package-app.sh",
+    "dev": "cd native && swift run"
   }
 }

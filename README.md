@@ -1,6 +1,12 @@
-# SecretSauce 🥫
+<p align="center">
+  <img src="native/Resources/icon.png" alt="SecretSauce icon" width="160" height="160">
+</p>
 
-A premium, lightweight macOS desktop utility to view and manage environment variables, secrets, `.env` files, and Launchd agents in one unified dashboard.
+<h1 align="center">SecretSauce 🥫</h1>
+
+<p align="center">
+  A premium, lightweight, <strong>native</strong> macOS app to view and manage environment variables, secrets, <code>.env</code> files, and Launchd agents in one unified dashboard.
+</p>
 
 ---
 
@@ -18,12 +24,10 @@ In the modern developer workflow, building with AI assistants (especially cloud-
 
 ## 🚀 Download Pre-Compiled Releases
 
-You do not need to build the app from source! You can download the latest version pre-compiled for your Mac architecture directly from the GitHub releases:
+You do not need to build the app from source! You can download the latest pre-compiled version directly from the GitHub releases:
 
 1. Go to the [Releases](../../releases) tab on your GitHub repository.
-2. Download the ZIP package corresponding to your Mac:
-   - **Apple Silicon (M1/M2/M3/M4/etc.):** Download `SecretSauce-mac-arm64.zip`
-   - **Intel Macs:** Download `SecretSauce-mac-x64.zip`
+2. Download `SecretSauce-mac-universal.zip` — a single universal build that runs natively on both Apple Silicon and Intel Macs.
 3. Unzip the file and move `SecretSauce.app` into your `/Applications` directory.
 
 > [!NOTE]
@@ -42,61 +46,41 @@ You do not need to build the app from source! You can download the latest versio
 - **`.env` File Editor:** Easily create or open any local `.env` configuration file to edit key-value pairs inside a clean interface.
 - **macOS Keychain Integration:** Safely view, add, or delete secure generic passwords stored in the macOS Keychain under the `SecretSauce:<key>` namespace. Uses a local filesystem index (`~/.secret-sauce-keychain-index.json`) for quick listing. Automatically migrates old data from `EnvManager` namespace.
 - **Launchd Management:** View, load, unload, start, and stop macOS Launchd agents, allowing you to manage plist-based background services and environment variables on the fly.
-- **Local System Environment:** Inspect active environment variables (`process.env`) currently accessible to applications.
+- **Local System Environment:** Inspect the active session's environment variables, and persist any of them to your shell profile with one click.
 
 ---
 
 ## 🛠️ Build and Development
 
+SecretSauce is a native SwiftUI app (macOS 13+) built with Swift Package Manager. It lives in `native/` and ships as a ~2 MB universal binary.
+
 ### Prerequisites
 
-- macOS
-- Node.js (v18 or newer)
-- npm (v9 or newer)
+- macOS 13 or newer
+- Xcode Command Line Tools — install with `xcode-select --install`
 
-### 1. Installation
+No Node, no Xcode IDE, and no third-party dependencies are required.
 
-Clone this repository and install the dependencies from the root directory:
-
-```bash
-git clone <your-repository-url>
-cd SecretSauce
-npm install
-```
-
-### 2. Run in Development Mode
-
-Run the following command in one terminal to spin up the Vite development server:
+### Run in Development Mode
 
 ```bash
-npm run dev
+cd native && swift run
 ```
 
-In another terminal, launch the Electron application wrapper:
+### Package a Standalone `.app`
+
+This builds the Apple Silicon and Intel slices, merges them into a universal binary, and assembles an ad-hoc-signed `release/SecretSauce.app`:
 
 ```bash
-npx electron .
+npm run package      # alias for: bash native/package-app.sh
 ```
 
-### 3. Package Standalone `.app`
-
-To package a standalone `.app` bundle:
-
-- **Apple Silicon (ARM64):**
-  ```bash
-  npm run package:mac-arm
-  ```
-- **Intel (x64):**
-  ```bash
-  npm run package:mac-x64
-  ```
-
-The compiled binaries will be outputted to the `release/` directory.
+The compiled bundle is written to the `release/` directory.
 
 ---
 
 ## 🔒 Security & Architecture
 
-- **Keychain Operations:** Accesses macOS Keychain using the native `/usr/bin/security` command-line utility. This avoids unsafe node module packaging issues.
-- **Configuration Editing:** Uses native `/usr/bin/plutil` and `/bin/launchctl` to interface securely with user Plist agents.
-- **IPC Sandboxing:** Employs IPC (Inter-Process Communication) and preload script bridging (`electron/preload.cjs`) to separate frontend web views from system-level privilege actions.
+- **Keychain Operations:** Accesses the macOS Keychain through the native `/usr/bin/security` command-line utility, so existing keychain access controls remain valid.
+- **Launchd Management:** Reads and writes agent plists with `PropertyListSerialization` and controls services via `/bin/launchctl`.
+- **No Web Layer:** As a native AppKit/SwiftUI app, there is no embedded browser, renderer process, or IPC bridge — system-level actions run directly in a single process.
