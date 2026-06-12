@@ -40,6 +40,7 @@ struct ConnectionMapView: NSViewRepresentable {
             center: CLLocationCoordinate2D(latitude: 50.5, longitude: 10.0),
             span: MKCoordinateSpan(latitudeDelta: 75, longitudeDelta: 160)
         ), animated: false)
+        context.coordinator.installArcOverlay(on: map)
         return map
     }
 
@@ -50,7 +51,7 @@ struct ConnectionMapView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ map: MKMapView, coordinator: Coordinator) {
-        coordinator.stopDashAnimation()
+        coordinator.teardown()
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -81,25 +82,34 @@ struct ConnectionMapView: NSViewRepresentable {
         }
     }
 
+    /// NSTrackingArea retains its owner strongly. With `owner: self` the view
+    /// retains the area and the area retains the view — a cycle that leaks every
+    /// annotation view (plus its layers). This stand-in owner receives the
+    /// enter/exit events and forwards them to the view through a weak reference.
+    fileprivate final class HoverOwner: NSObject {
+        var onHover: ((Bool) -> Void)?
+        @objc(mouseEntered:) func mouseEntered(with event: NSEvent) { onHover?(true) }
+        @objc(mouseExited:) func mouseExited(with event: NSEvent) { onHover?(false) }
+    }
+
     /// Annotation view with mouse-hover tracking and a selection ring.
     fileprivate final class DotView: MKAnnotationView {
         var hoverChanged: ((Bool) -> Void)?
         private var selectionRing: CAShapeLayer?
+        private let hoverOwner = HoverOwner()
 
         override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
             super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+            hoverOwner.onHover = { [weak self] inside in self?.hoverChanged?(inside) }
             addTrackingArea(NSTrackingArea(
                 rect: .zero,
                 options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
-                owner: self, userInfo: nil
+                owner: hoverOwner, userInfo: nil
             ))
         }
 
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-        override func mouseEntered(with event: NSEvent) { hoverChanged?(true) }
-        override func mouseExited(with event: NSEvent) { hoverChanged?(false) }
 
         func attachSelectionRing(_ ring: CAShapeLayer) {
             selectionRing = ring
@@ -112,6 +122,13 @@ struct ConnectionMapView: NSViewRepresentable {
         }
     }
 
+    /// Click-through host for the arc shape layer; sits above the map so the
+    /// arcs render without touching MapKit's tile pipeline.
+    fileprivate final class PassthroughView: NSView {
+        override var isFlipped: Bool { true }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+
     // MARK: Coordinator
 
     final class Coordinator: NSObject, MKMapViewDelegate {
@@ -120,9 +137,34 @@ struct ConnectionMapView: NSViewRepresentable {
 
         private var contentKey = ""
         private var suppressSelectionCallbacks = false
-        private var dashTimer: Timer?
-        private var dashPhase: CGFloat = 0
-        private var lineRenderers: [MKPolylineRenderer] = []
+
+        // Arcs live in one CAShapeLayer hovering above the map instead of
+        // MKOverlayRenderers: animating renderers means setNeedsDisplay at frame
+        // rate, and each call re-rasterizes overlay tiles at every zoom scale —
+        // MapKit's draw queue then grows without bound (the 125 GB swap bug).
+        // A shape layer animates lineDashPhase on the GPU with zero redraws.
+        private var arcs: [[CLLocationCoordinate2D]] = []
+        private weak var arcHost: PassthroughView?
+        private let arcLayer = CAShapeLayer()
+
+        func installArcOverlay(on map: MKMapView) {
+            let host = PassthroughView(frame: map.bounds)
+            host.autoresizingMask = [.width, .height]
+            host.wantsLayer = true
+            arcLayer.strokeColor = ConnectionMapView.brandBlue.withAlphaComponent(0.95).cgColor
+            arcLayer.fillColor = NSColor.clear.cgColor
+            arcLayer.lineWidth = 2.5
+            arcLayer.lineDashPattern = [7, 6]
+            arcLayer.lineCap = .round
+            host.layer?.addSublayer(arcLayer)
+            map.addSubview(host, positioned: .above, relativeTo: nil)
+            arcHost = host
+        }
+
+        func teardown() {
+            arcLayer.removeAllAnimations()
+            arcHost?.removeFromSuperview()
+        }
 
         fileprivate func apply(home: NetworkMonitorService.GeoInfo?, endpoints: [MapEndpoint],
                                selectedID: String?, to map: MKMapView) {
@@ -137,8 +179,6 @@ struct ConnectionMapView: NSViewRepresentable {
             defer { suppressSelectionCallbacks = false }
 
             map.removeAnnotations(map.annotations)
-            map.removeOverlays(map.overlays)
-            lineRenderers.removeAll()
 
             var toReselect: MKAnnotation?
             for e in endpoints {
@@ -146,42 +186,83 @@ struct ConnectionMapView: NSViewRepresentable {
                 map.addAnnotation(a)
                 if e.id == selectedID { toReselect = a }
             }
+            arcs = []
             if let home {
                 let h = HomeAnnotation(geo: home)
                 map.addAnnotation(h)
-                for e in endpoints {
-                    var coords = [h.coordinate, e.coordinate]
-                    map.addOverlay(MKGeodesicPolyline(coordinates: &coords, count: 2))
-                }
+                arcs = endpoints.map { Self.geodesicSamples(from: h.coordinate, to: $0.coordinate) }
             }
             if let toReselect {
                 map.selectAnnotation(toReselect, animated: false)
             }
 
-            if map.overlays.isEmpty {
-                stopDashAnimation()
-            } else {
-                startDashAnimation()
-            }
+            refreshArcPath(on: map)
         }
 
-        // MARK: Dash flow animation
+        // MARK: Arc geometry
 
-        private func startDashAnimation() {
-            guard dashTimer == nil else { return }
-            dashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
-                guard let self else { return }
-                self.dashPhase -= 0.7
-                for r in self.lineRenderers {
-                    r.lineDashPhase = self.dashPhase
-                    r.setNeedsDisplay(.world)
+        /// Great-circle sample points between two coordinates, reusing
+        /// MKGeodesicPolyline's interpolation (it is never added to the map).
+        private static func geodesicSamples(from a: CLLocationCoordinate2D,
+                                            to b: CLLocationCoordinate2D) -> [CLLocationCoordinate2D] {
+            var pair = [a, b]
+            let line = MKGeodesicPolyline(coordinates: &pair, count: 2)
+            let count = line.pointCount
+            guard count > 2 else { return pair }
+            let step = max(1, count / 64)
+            var coords: [CLLocationCoordinate2D] = []
+            coords.reserveCapacity(count / step + 2)
+            var i = 0
+            while i < count {
+                coords.append(line.points()[i].coordinate)
+                i += step
+            }
+            coords.append(b)
+            return coords
+        }
+
+        /// Re-projects the cached arcs into view space. Cheap (a few hundred
+        /// coordinate conversions), so it can run on every visible-region change.
+        fileprivate func refreshArcPath(on map: MKMapView) {
+            guard let host = arcHost else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+
+            guard !arcs.isEmpty else {
+                arcLayer.path = nil
+                arcLayer.removeAllAnimations()
+                return
+            }
+            let path = CGMutablePath()
+            // An arc crossing the antimeridian jumps across the view; break the
+            // line there instead of drawing a horizontal streak.
+            let wrapJump = map.bounds.width / 2
+            for arc in arcs {
+                var prev: CGPoint?
+                for coord in arc {
+                    let p = map.convert(coord, toPointTo: host)
+                    if let prev, abs(p.x - prev.x) < wrapJump {
+                        path.addLine(to: p)
+                    } else {
+                        path.move(to: p)
+                    }
+                    prev = p
                 }
             }
+            arcLayer.path = path
+            if arcLayer.animation(forKey: "dashFlow") == nil {
+                let anim = CABasicAnimation(keyPath: "lineDashPhase")
+                anim.fromValue = 0
+                anim.toValue = -13          // one dash period (7 + 6)
+                anim.duration = 13.0 / 14.0 // matches the old 14 pt/s flow speed
+                anim.repeatCount = .infinity
+                arcLayer.add(anim, forKey: "dashFlow")
+            }
         }
 
-        func stopDashAnimation() {
-            dashTimer?.invalidate()
-            dashTimer = nil
+        func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+            refreshArcPath(on: mapView)
         }
 
         // MARK: Selection
@@ -197,17 +278,6 @@ struct ConnectionMapView: NSViewRepresentable {
         }
 
         // MARK: Rendering
-
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            guard let line = overlay as? MKPolyline else { return MKOverlayRenderer(overlay: overlay) }
-            let r = MKPolylineRenderer(polyline: line)
-            r.strokeColor = ConnectionMapView.brandBlue.withAlphaComponent(0.95)
-            r.lineWidth = 2.5
-            r.lineDashPattern = [7, 6]
-            r.lineCap = .round
-            lineRenderers.append(r)
-            return r
-        }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if let home = annotation as? HomeAnnotation {

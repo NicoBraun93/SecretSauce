@@ -12,7 +12,10 @@ struct NetworkView: View {
     @State private var search = ""
     @State private var groupByApp = true
     @State private var remoteOnly = true
-    @State private var showMap = true
+    // Persisted so the user's choice survives tab switches (NetworkView is
+    // destroyed on switch-away, resetting plain @State) and relaunches. Hiding
+    // the map tears down MKMapView/Metal, avoiding its tile-rasterization spike.
+    @AppStorage("network.showMap") private var showMap = true
     @State private var loading = true
     @State private var resolvingGeo = false
     @State private var errorMessage: String?
