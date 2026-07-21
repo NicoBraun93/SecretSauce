@@ -82,6 +82,36 @@ jobs:
           echo "Compressing universal macOS build..."
           ditto -c -k --sequesterRsrc --keepParent release/SecretSauce.app dist-release/SecretSauce-mac-universal.zip
 
+      - name: Generate Sparkle appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ steps.versioning.outputs.version }}
+        run: |
+          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
+            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set — cannot sign the appcast." >&2
+            exit 1
+          fi
+          # generate_appcast ships with the Sparkle SPM artifact that package-app.sh
+          # already resolved during the build step.
+          GEN="$(find native/.build/artifacts -type f -name generate_appcast | head -1)"
+          if [ -z "$GEN" ]; then
+            echo "::error::generate_appcast not found under native/.build/artifacts" >&2
+            exit 1
+          fi
+          KEYFILE="$(mktemp)"
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$KEYFILE"
+          # EdDSA-sign the archive and emit a single-item appcast whose enclosure
+          # points at this release's zip asset.
+          "$GEN" \
+            --ed-key-file "$KEYFILE" \
+            --download-url-prefix "https://github.com/NicoBraun93/SecretSauce/releases/download/${RELEASE_TAG}/" \
+            --link "https://github.com/NicoBraun93/SecretSauce" \
+            -o dist-release/appcast.xml \
+            dist-release
+          rm -f "$KEYFILE"
+          echo "----- appcast.xml -----"
+          cat dist-release/appcast.xml
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -107,5 +137,6 @@ jobs:
           prerelease: false
           files: |
             dist-release/SecretSauce-mac-universal.zip
+            dist-release/appcast.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

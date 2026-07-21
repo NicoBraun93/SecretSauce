@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct SecretSauceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var updater = UpdaterService()
 
     var body: some Scene {
         WindowGroup {
@@ -28,5 +29,11 @@ struct SecretSauceApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 740)
+        .commands {
+            // Sparkle "Check for Updates…" under the app menu, next to About.
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updater)
+            }
+        }
     }
 }
