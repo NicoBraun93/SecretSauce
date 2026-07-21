@@ -54,6 +54,7 @@ Updates are verified by a cryptographic (EdDSA) signature rather than an Apple D
 - **Launchd Management:** View, load, unload, start, and stop macOS Launchd agents, allowing you to manage plist-based background services and environment variables on the fly.
 - **Local System Environment:** Inspect the active session's environment variables, and persist any of them to your shell profile with one click.
 - **Network Monitor:** A read-only, Little-Snitch-style view of your machine's open connections: which app talks to which remote IP, host, port, and state — plus a world map with your own location and animated arcs to every endpoint. Hover a dot for details, click it to filter the table. Country/city lookup runs when you open the tab or press Refresh, and is the only thing in the app that sends data off-device.
+- **Memory Overview:** A live RAM dashboard — memory pressure (with a composition breakdown of wired/active/compressed/cached/free and a swap warning), the memory footprint of your own launch agents with an inline **Stop** to reclaim it, and the biggest system-wide consumers clustered per app with **Show** and **Quit** actions. Snapshot-based (no polling), refreshed on open and on demand.
 
 ---
 
