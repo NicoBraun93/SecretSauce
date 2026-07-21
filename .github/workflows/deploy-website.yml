@@ -1,0 +1,51 @@
+name: Deploy Website (Azure Static Web Apps)
+
+# Publishes the static marketing site in website/ to the SecretSauce Azure
+# Static Web App (custom domain: https://secretsauce.nicobraun.net) on every
+# push to main that touches the site. The SWA resource + deployment token are
+# provisioned by the IaC repo (module.azure.secretsauce_website_*); add the
+# token as the AZURE_STATIC_WEB_APPS_API_TOKEN_SECRETSAUCE repo secret.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    name: Build and Deploy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SECRETSAUCE }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # for PR preview comments
+          action: "upload"
+          # Pure static HTML/CSS/JS — no framework build. Upload website/ as-is.
+          app_location: "website"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request
+    steps:
+      - name: Close Pull Request
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SECRETSAUCE }}
+          action: "close"
