@@ -38,6 +38,12 @@ You do not need to build the app from source! You can download the latest pre-co
 >   xattr -cr /Applications/SecretSauce.app
 >   ```
 
+### Automatic Updates
+
+You only need to do the manual download **once**. SecretSauce ships with [Sparkle](https://sparkle-project.org): it checks the GitHub releases feed for newer versions and can download and install them in place. Trigger a check any time from the app menu — **SecretSauce → Check for Updates…** — and the app also checks periodically in the background.
+
+Updates are verified by a cryptographic (EdDSA) signature rather than an Apple Developer ID, and Sparkle clears the quarantine flag on the versions it installs, so auto-updates launch cleanly without the Gatekeeper step above.
+
 ---
 
 ## ✨ Features
@@ -53,14 +59,14 @@ You do not need to build the app from source! You can download the latest pre-co
 
 ## 🛠️ Build and Development
 
-SecretSauce is a native SwiftUI app (macOS 13+) built with Swift Package Manager. It lives in `native/` and ships as a ~2 MB universal binary.
+SecretSauce is a native SwiftUI app (macOS 13+) built with Swift Package Manager. It lives in `native/` and ships as a ~7 MB universal `.app` (a ~2 MB app plus the embedded Sparkle auto-update framework).
 
 ### Prerequisites
 
 - macOS 13 or newer
 - Xcode Command Line Tools — install with `xcode-select --install`
 
-No Node, no Xcode IDE, and no third-party dependencies are required.
+No Node and no Xcode IDE are required. The only third-party dependency is [Sparkle](https://github.com/sparkle-project/Sparkle) (auto-update), pulled in automatically by Swift Package Manager.
 
 ### Run in Development Mode
 
