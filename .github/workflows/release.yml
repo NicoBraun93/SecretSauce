@@ -112,27 +112,58 @@ jobs:
           echo "----- appcast.xml -----"
           cat dist-release/appcast.xml
 
+      - name: Generate release notes
+        env:
+          VERSION: ${{ steps.versioning.outputs.version }}
+        run: |
+          # Previous release tag = newest v* tag other than the one just created.
+          PREV_TAG=$(git tag -l 'v*' --sort=-v:refname | grep -vx "$VERSION" | head -n1)
+          echo "Previous tag: ${PREV_TAG:-<none>}"
+
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="$PREV_TAG..HEAD"
+            COMPARE="**Full changelog:** https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${VERSION}"
+          else
+            RANGE="HEAD"
+            COMPARE=""
+          fi
+
+          # Commit subjects since the previous release (skip merge commits).
+          CHANGES=$(git log --no-merges --pretty=format:'- %s (%h)' $RANGE)
+          [ -z "$CHANGES" ] && CHANGES="- Maintenance release (no code changes)."
+
+          {
+            echo "## What's Changed"
+            echo
+            echo "$CHANGES"
+            echo
+            [ -n "$COMPARE" ] && { echo "$COMPARE"; echo; }
+            echo "---"
+            echo
+            echo "Native macOS build of SecretSauce — a single universal binary (Apple Silicon + Intel)."
+            echo
+            echo "### Installation"
+            echo
+            echo "1. Download \`SecretSauce-mac-universal.zip\`."
+            echo "2. Extract it to get \`SecretSauce.app\`."
+            echo "3. Move \`SecretSauce.app\` to your \`/Applications\` directory."
+            echo "4. **Gatekeeper:** this app is self-signed/unsigned, so macOS may block the first launch. Right-click the app and choose **Open**, or run:"
+            echo '   ```bash'
+            echo "   xattr -cr /Applications/SecretSauce.app"
+            echo '   ```'
+            echo
+            echo "> Already installed? The app updates itself automatically via Sparkle — no need to re-download."
+          } > RELEASE_NOTES.md
+
+          echo "----- RELEASE_NOTES.md -----"
+          cat RELEASE_NOTES.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.versioning.outputs.version }}
           name: SecretSauce ${{ steps.versioning.outputs.version }}
-          body: |
-            ## Automated Release
-
-            Native macOS build of SecretSauce — a single universal binary (Apple Silicon + Intel).
-
-            ### Installation Instructions
-
-            1. Download `SecretSauce-mac-universal.zip`.
-            2. Extract it to get `SecretSauce.app`.
-            3. Move `SecretSauce.app` to your `/Applications` directory.
-            4. **Note on Gatekeeper:** Since this app is self-signed/unsigned, macOS might block its first launch. To run it:
-               - Right-click `SecretSauce.app` and choose **Open**, OR
-               - Run the following command in Terminal:
-                 ```bash
-                 xattr -cr /Applications/SecretSauce.app
-                 ```
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           files: |
