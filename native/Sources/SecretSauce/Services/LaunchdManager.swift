@@ -11,6 +11,7 @@ enum LaunchdManager {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: agentsDir) else { return [] }
         let statuses = launchctlStatuses()
+        let rssByPid = residentMemoryByPid()
 
         var services: [LaunchdService] = []
         for f in files.sorted() where f.hasSuffix(".plist") {
@@ -40,7 +41,8 @@ enum LaunchdManager {
                 program: program,
                 loaded: status != nil,
                 pid: status?.pid,
-                lastExitCode: status?.lastExitCode
+                lastExitCode: status?.lastExitCode,
+                memoryBytes: status?.pid.flatMap { rssByPid[$0] }
             ))
         }
         return services
@@ -58,6 +60,18 @@ enum LaunchdManager {
             statuses[label] = (pid, exitCode)
         }
         return statuses
+    }
+
+    /// Maps pid -> resident set size in bytes via a single `ps` call.
+    private static func residentMemoryByPid() -> [Int: UInt64] {
+        guard let out = try? ProcessRunner.run("/bin/ps", ["-A", "-o", "pid=,rss="]) else { return [:] }
+        var map: [Int: UInt64] = [:]
+        for line in out.components(separatedBy: "\n") {
+            let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = Int(parts[0]), let rssKB = UInt64(parts[1]) else { continue }
+            map[pid] = rssKB * 1024
+        }
+        return map
     }
 
     private static func readPlist(_ filePath: String) throws -> [String: Any] {

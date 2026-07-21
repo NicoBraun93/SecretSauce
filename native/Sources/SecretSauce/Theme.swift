@@ -60,4 +60,5 @@ extension Color {
     
     static let dsSuccess = Color(red: 16/255, green: 185/255, blue: 129/255)
     static let dsWarning = Color(red: 245/255, green: 158/255, blue: 11/255)
+    static let dsDanger = Color(red: 239/255, green: 68/255, blue: 68/255) // #ef4444
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
+    case overview = "Overview"
     case localEnv = "Local Env"
     case shell = "Shell Profile"
     case envFiles = ".env Files"
@@ -12,6 +13,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .overview: return "gauge.with.dots.needle.67percent"
         case .localEnv: return "macwindow"
         case .shell: return "terminal"
         case .envFiles: return "doc.text"
@@ -23,7 +25,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @State private var section: AppSection = .localEnv
+    @State private var section: AppSection = .overview
 
     var body: some View {
         NavigationSplitView {
@@ -38,6 +40,7 @@ struct ContentView: View {
             .listStyle(.sidebar)
         } detail: {
             switch section {
+            case .overview: OverviewView()
             case .localEnv: LocalEnvView()
             case .shell: ShellProfileView()
             case .envFiles: EnvFilesView()

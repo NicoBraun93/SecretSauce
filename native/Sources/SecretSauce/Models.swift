@@ -14,7 +14,61 @@ struct LaunchdService: Identifiable, Equatable {
     var loaded: Bool
     var pid: Int?
     var lastExitCode: Int?
+    /// Resident set size of the running process (bytes), nil when not running.
+    var memoryBytes: UInt64?
     var id: String { label }
+}
+
+/// A snapshot of system-wide physical memory, derived from `vm_stat` +
+/// `sysctl vm.swapusage`. All figures in bytes.
+struct SystemMemory: Equatable {
+    var total: UInt64
+    var wired: UInt64
+    var active: UInt64
+    var compressed: UInt64
+    var inactive: UInt64      // cached / reclaimable
+    var free: UInt64
+    var swapUsed: UInt64
+
+    /// Memory that is expensive to reclaim (drives the pressure gauge).
+    var used: UInt64 { wired + active + compressed }
+    var usedFraction: Double { total == 0 ? 0 : Double(used) / Double(total) }
+
+    enum Pressure { case normal, warning, critical }
+    var pressure: Pressure {
+        switch usedFraction {
+        case ..<0.70: return .normal
+        case ..<0.85: return .warning
+        default: return .critical
+        }
+    }
+
+    static let zero = SystemMemory(total: 0, wired: 0, active: 0, compressed: 0,
+                                   inactive: 0, free: 0, swapUsed: 0)
+}
+
+/// A memory consumer for the Overview "top consumers" list. Rows are clustered
+/// by their top-level `.app` bundle, so all of an app's helper processes
+/// (e.g. every "Google Chrome Helper (Renderer)") roll up into one row.
+struct MemoryProcess: Identifiable, Equatable {
+    var name: String            // group / display name
+    var memoryBytes: UInt64     // summed RSS across the cluster
+    var processCount: Int       // number of PIDs folded in
+    var bundlePath: String?     // "…/X.app" — enables Show/Quit; nil for daemons
+    var id: String { name }
+
+    /// Only app bundles can be shown/quit; system daemons cannot.
+    var isApp: Bool { bundlePath != nil }
+}
+
+/// Shared human-readable byte formatter (e.g. "1.4 GB", "312 MB").
+enum ByteFormat {
+    static func string(_ bytes: UInt64) -> String {
+        let f = ByteCountFormatter()
+        f.countStyle = .memory
+        f.allowedUnits = [.useMB, .useGB]
+        return f.string(fromByteCount: Int64(bytes))
+    }
 }
 
 /// One open network endpoint, parsed from `lsof -nP -i -F`. Read-only snapshot —

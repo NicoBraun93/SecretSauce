@@ -62,6 +62,12 @@ struct LaunchdView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
+                        Spacer(minLength: 4)
+                        if let mem = s.memoryBytes {
+                            Text(ByteFormat.string(mem))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .tag(s.label)
                 }
@@ -97,6 +103,7 @@ struct LaunchdView: View {
                     HStack(spacing: 12) {
                         statusCard("State", s.loaded ? "Loaded" : "Unloaded", s.loaded ? Color.dsSuccess : Color.dsMutedForeground)
                         statusCard("Process (PID)", s.pid.map(String.init) ?? "Not Running", s.pid != nil ? Color.dsSuccess : Color.dsMutedForeground)
+                        statusCard("Memory (RSS)", s.memoryBytes.map(ByteFormat.string) ?? "—", s.memoryBytes != nil ? Color.dsPrimary : Color.dsMutedForeground)
                         if s.loaded, let code = s.lastExitCode {
                             statusCard("Last Exit Code", String(code), Color.dsPrimary)
                         }
