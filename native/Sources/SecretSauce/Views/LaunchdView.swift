@@ -32,6 +32,7 @@ struct LaunchdView: View {
                 Spacer()
                 Button("Refresh") { load() }
                     .controlSize(.small)
+                    .help("Re-reads ~/Library/LaunchAgents, `launchctl list`, the disabled overrides and the process table.")
             }
             .padding(10)
             Divider()
@@ -50,25 +51,26 @@ struct LaunchdView: View {
                 List(services, selection: $selectedLabel) { s in
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(s.loaded && s.pid != nil ? Color.dsSuccess : s.loaded ? Color.dsWarning : Color.dsMutedForeground)
+                            .fill(dotColor(s))
                             .frame(width: 8, height: 8)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(s.label)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
-                            Text(URL(fileURLWithPath: s.filePath).lastPathComponent)
-                                .font(.caption)
+                            Text(usageCaption(s) ?? URL(fileURLWithPath: s.filePath).lastPathComponent)
+                                .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
                         Spacer(minLength: 4)
-                        if let mem = s.memoryBytes {
-                            Text(ByteFormat.string(mem))
-                                .font(.caption.monospacedDigit())
+                        if s.disabled {
+                            Image(systemName: "moon.zzz.fill")
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .help(stateSummary(s))
                     .tag(s.label)
                 }
                 .listStyle(.sidebar)
@@ -76,11 +78,40 @@ struct LaunchdView: View {
         }
     }
 
+    private func dotColor(_ s: LaunchdService) -> Color {
+        if s.disabled { return Color.dsMutedForeground }
+        if s.loaded && s.pid != nil { return Color.dsSuccess }
+        return s.loaded ? Color.dsWarning : Color.dsMutedForeground
+    }
+
+    /// "14 MB · 2.3%" for running jobs, nil when there is no process to measure.
+    private func usageCaption(_ s: LaunchdService) -> String? {
+        guard let mem = s.memoryBytes else { return nil }
+        var caption = ByteFormat.string(mem)
+        if let cpu = s.cpuPercent {
+            caption += String(format: " · %.1f%%", cpu)
+        }
+        return caption
+    }
+
+    private func stateSummary(_ s: LaunchdService) -> String {
+        if s.disabled {
+            return "Disabled in launchd's override database — stays off after a reboot."
+        }
+        if !s.loaded {
+            return "Not loaded in this session, but the plist is still in ~/Library/LaunchAgents, so it loads again at the next login."
+        }
+        if s.pid == nil {
+            return "Loaded but not running — waiting for its trigger, or it has already exited."
+        }
+        return "Loaded and running (pid \(s.pid ?? 0))."
+    }
+
     @ViewBuilder
     private var details: some View {
         if let s = selected {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(s.label).font(.title2.weight(.semibold))
                         PathPill(text: s.filePath)
@@ -100,29 +131,8 @@ struct LaunchdView: View {
                         }
                     }
 
-                    HStack(spacing: 12) {
-                        statusCard("State", s.loaded ? "Loaded" : "Unloaded", s.loaded ? Color.dsSuccess : Color.dsMutedForeground)
-                        statusCard("Process (PID)", s.pid.map(String.init) ?? "Not Running", s.pid != nil ? Color.dsSuccess : Color.dsMutedForeground)
-                        statusCard("Memory (RSS)", s.memoryBytes.map(ByteFormat.string) ?? "—", s.memoryBytes != nil ? Color.dsPrimary : Color.dsMutedForeground)
-                        if s.loaded, let code = s.lastExitCode {
-                            statusCard("Last Exit Code", String(code), Color.dsPrimary)
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        if !s.loaded {
-                            Button("Load Agent Plist") { control(.load, s) }
-                                .buttonStyle(.borderedProminent)
-                        } else {
-                            Button("Unload Agent Plist", role: .destructive) { control(.unload, s) }
-                            if s.pid != nil {
-                                Button("Stop Service") { control(.stop, s) }
-                            } else {
-                                Button("Start Service") { control(.start, s) }
-                                    .buttonStyle(.borderedProminent)
-                            }
-                        }
-                    }
+                    controlRow(s)
+                    statusGrid(s)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Environment Variables").font(.headline)
@@ -164,7 +174,115 @@ struct LaunchdView: View {
         }
     }
 
-    private func statusCard(_ label: String, _ value: String, _ color: Color) -> some View {
+    // MARK: - Controls
+
+    /// The whole tab boils down to two questions: does it come back after a
+    /// reboot (the toggle), and is it running right now (the button). Everything
+    /// else is explanation, and explanation lives in the ⓘ tooltip so the row
+    /// stays readable at a glance.
+    private func controlRow(_ s: LaunchdService) -> some View {
+        HStack(spacing: 8) {
+            Toggle("Autostart", isOn: autostartBinding(s))
+                .toggleStyle(.switch)
+
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+                .help(controlsExplanation(s))
+
+            Spacer()
+
+            Button(s.pid != nil ? "Deactivate" : "Activate") {
+                s.pid != nil ? deactivate(s) : activate(s)
+            }
+            .buttonStyle(.bordered)
+            .tint(s.pid != nil ? .red : Color.dsPrimary)
+        }
+        .padding(12)
+        .background(Color.dsSecondary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func controlsExplanation(_ s: LaunchdService) -> String {
+        var text = """
+        Autostart — permanent. launchd re-reads ~/Library/LaunchAgents at every login, so simply stopping an agent does not keep it away. Switching this off runs `launchctl disable`, which records the label in launchd's override database and survives a reboot. Switching it on runs `launchctl enable` and loads the plist again.
+
+        Activate / Deactivate — right now, until the next login. Deactivate unloads the agent and kills its process; Activate loads it and starts it.
+        """
+        if !s.runAtLoad {
+            text += "\n\nThis agent has no `RunAtLoad` key, so even with Autostart on launchd only loads it at login and waits for its trigger (a socket, a watched path, or a calendar interval) before running it."
+        }
+        if s.keepAlive {
+            text += "\n\n`KeepAlive` is set: launchd restarts this job whenever it exits, so Deactivate (which unloads it) is the only thing that stops it for this session."
+        }
+        return text
+    }
+
+    // MARK: - Status
+
+    /// A grid rather than an HStack: eight fixed-width cards overflow the detail
+    /// column on a narrow window.
+    private func statusGrid(_ s: LaunchdService) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+            statusCard("State", s.loaded ? "Loaded" : "Unloaded",
+                       s.loaded ? Color.dsSuccess : Color.dsMutedForeground,
+                       help: "Whether the job is registered with the launchd session running right now. Says nothing about the next login — that is the Autostart toggle.")
+
+            statusCard("Starts", startsValue(s), startsColor(s),
+                       help: startsHelp(s))
+
+            statusCard("Process (PID)", s.pid.map(String.init) ?? "Not Running",
+                       s.pid != nil ? Color.dsSuccess : Color.dsMutedForeground,
+                       help: "The pid launchd tracks for this job. A job can be loaded without running — on-demand agents only start when their trigger fires.")
+
+            statusCard("Memory (RSS)", s.memoryBytes.map(ByteFormat.string) ?? "—",
+                       s.memoryBytes != nil ? Color.dsPrimary : Color.dsMutedForeground,
+                       help: "Resident set size: physical RAM held by the job and its \(s.childProcessCount) child process\(s.childProcessCount == 1 ? "" : "es"). Excludes swapped-out and file-backed pages, so it is what the job actually costs in RAM right now.")
+
+            statusCard("CPU", s.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—",
+                       cpuColor(s),
+                       help: "CPU share of the job's process tree as reported by `ps` — a decaying average over roughly the last minute, not an instant sample. 100% is one saturated core, so a multi-threaded job can go above it.")
+
+            statusCard("Processes", s.pid != nil ? "\(s.childProcessCount + 1)" : "—",
+                       s.pid != nil ? Color.dsPrimary : Color.dsMutedForeground,
+                       help: "Main process plus every descendant it spawned. Memory and CPU above are summed over all of them, because wrapper scripts put the real cost in their children.")
+
+            statusCard("Uptime", s.uptime ?? "—",
+                       s.uptime != nil ? Color.dsPrimary : Color.dsMutedForeground,
+                       help: "Wall-clock time since the main process started, as `[days-]hh:mm:ss`. A value that keeps resetting means the job is crash-looping and being restarted by KeepAlive.")
+
+            if s.loaded, let code = s.lastExitCode {
+                statusCard("Last Exit Code", String(code),
+                           code == 0 ? Color.dsPrimary : Color.dsWarning,
+                           help: "Exit status of the last run, from `launchctl list`. 0 means a clean exit; anything else is how the job failed.")
+            }
+
+            if s.keepAlive {
+                statusCard("KeepAlive", "On", Color.dsWarning,
+                           help: "The plist asks launchd to restart this job whenever it exits. Stopping it in this session is pointless — launchd brings it straight back. Disable Autostart is the way to stop it.")
+            }
+        }
+    }
+
+    private func startsValue(_ s: LaunchdService) -> String {
+        if s.disabled { return "Never" }
+        return s.runAtLoad ? "At Login" : "On Trigger"
+    }
+
+    private func startsColor(_ s: LaunchdService) -> Color {
+        if s.disabled { return Color.dsMutedForeground }
+        return s.runAtLoad ? Color.dsSuccess : Color.dsPrimary
+    }
+
+    private func startsHelp(_ s: LaunchdService) -> String {
+        if s.disabled {
+            return "Autostart is off — the label is disabled in launchd's override database, which survives a reboot. The plist is still on disk, but launchd will not load it."
+        }
+        if s.runAtLoad {
+            return "The plist sets `RunAtLoad`, so launchd starts this job at every login."
+        }
+        return "No `RunAtLoad` in the plist — launchd loads this job at login and then waits for its trigger (a socket, a watched path, or a calendar interval) before running it."
+    }
+
+    private func statusCard(_ label: String, _ value: String, _ color: Color, help: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(.caption.weight(.semibold))
@@ -172,20 +290,65 @@ struct LaunchdView: View {
             Text(value)
                 .font(.title3.weight(.medium))
                 .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .padding(10)
-        .frame(minWidth: 130, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.dsSecondary, in: RoundedRectangle(cornerRadius: 10))
+        .help(help)
     }
 
-    private func control(_ action: LaunchdManager.Action, _ s: LaunchdService) {
+    private func cpuColor(_ s: LaunchdService) -> Color {
+        guard let cpu = s.cpuPercent else { return Color.dsMutedForeground }
+        return cpu >= 50 ? Color.dsWarning : Color.dsPrimary
+    }
+
+    // MARK: - Actions
+
+    /// Off writes launchd's override database, on clears it — both survive a reboot.
+    private func autostartBinding(_ s: LaunchdService) -> Binding<Bool> {
+        let (filePath, label) = (s.filePath, s.label)
+        return Binding(
+            get: { !s.disabled },
+            set: { enabled in
+                perform(enabled ? "launchctl enable" : "launchctl disable") {
+                    try LaunchdManager.setAutostart(enabled: enabled, filePath: filePath, label: label)
+                }
+            }
+        )
+    }
+
+    /// Make it run now: load it first if launchd does not know about it yet. A job
+    /// with `RunAtLoad` is already running by then, so the start is best-effort.
+    private func activate(_ s: LaunchdService) {
+        let (filePath, label) = (s.filePath, s.label)
+        let wasLoaded = s.loaded
+        perform("Activate") {
+            if wasLoaded {
+                try LaunchdManager.control(action: .start, filePath: filePath, label: label)
+            } else {
+                try LaunchdManager.control(action: .load, filePath: filePath, label: label)
+                try? LaunchdManager.control(action: .start, filePath: filePath, label: label)
+            }
+        }
+    }
+
+    /// Unload rather than stop: `stop` alone is pointless for a KeepAlive job —
+    /// launchd restarts it immediately.
+    private func deactivate(_ s: LaunchdService) {
+        let (filePath, label) = (s.filePath, s.label)
+        perform("Deactivate") {
+            try LaunchdManager.control(action: .unload, filePath: filePath, label: label)
+        }
+    }
+
+    private func perform(_ description: String, _ work: @escaping @Sendable () throws -> Void) {
         Task {
             do {
-                try await Task.detached(priority: .userInitiated) {
-                    try LaunchdManager.control(action: action, filePath: s.filePath, label: s.label)
-                }.value
+                try await Task.detached(priority: .userInitiated) { try work() }.value
             } catch {
-                errorMessage = "launchctl \(action.rawValue) failed: \(error.localizedDescription)"
+                errorMessage = "\(description) failed: \(error.localizedDescription)"
             }
             // Give launchd a moment to settle before refreshing status.
             try? await Task.sleep(nanoseconds: 500_000_000)

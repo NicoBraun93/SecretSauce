@@ -14,9 +14,27 @@ struct LaunchdService: Identifiable, Equatable {
     var loaded: Bool
     var pid: Int?
     var lastExitCode: Int?
-    /// Resident set size of the running process (bytes), nil when not running.
+    /// Resident set size of the job's whole process tree (bytes), nil when not running.
     var memoryBytes: UInt64?
+    /// CPU share of the job's process tree as reported by `ps` — a decaying
+    /// average over roughly the last minute, so 200 means two saturated cores.
+    var cpuPercent: Double?
+    /// Child processes folded into the memory/CPU figures above.
+    var childProcessCount: Int = 0
+    /// `ps` elapsed time of the main process, e.g. "02:14:07" or "3-01:12:44".
+    var uptime: String?
+    /// Disabled in launchd's override database. Unlike `unload`, this survives a
+    /// reboot, so the job does not come back at the next login.
+    var disabled: Bool = false
+    /// `RunAtLoad` in the plist: launchd starts the job the moment it is loaded
+    /// (i.e. at login) instead of waiting for a socket/path/calendar trigger.
+    var runAtLoad: Bool = false
+    /// `KeepAlive` in the plist: launchd restarts the job whenever it exits.
+    var keepAlive: Bool = false
     var id: String { label }
+
+    /// Whether this job will actually come up by itself at the next login.
+    var autostartsAtLogin: Bool { !disabled && runAtLoad }
 }
 
 /// A snapshot of system-wide physical memory, derived from `vm_stat` +
